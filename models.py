@@ -1,5 +1,5 @@
+from sqlalchemy import Boolean, Column, Integer, String, Date, LargeBinary, ForeignKey, PrimaryKeyConstraint
 
-from sqlalchemy import Boolean, Column, Integer, String, Date, LargeBinary
 from database import Base
 
 
@@ -11,7 +11,7 @@ class User(Base):
     email = Column(String(200), nullable=False, unique=True, index=True)
     password = Column(String(100), nullable=False)
     is_verified = Column(Boolean, default=False)
-    birth_date = Column(Date)
+    birthdate = Column(Date)
 
 
 class Book(Base):
@@ -30,3 +30,31 @@ class Book(Base):
     text = Column(String(200))
 
 
+
+class Voice(Base):
+    __tablename__ = 'voices'
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False)
+    photo = Column(String(200))
+    gender = Column(String(10), nullable=False)
+    audio = Column(String(200))
+
+
+
+class BookVoice(Base):
+    __tablename__ = 'book_voices'
+
+    book_id = Column(Integer, ForeignKey('books.id'), primary_key=True)
+    voice_id = Column(Integer, ForeignKey('voices.id'), primary_key=True)
+    audio = Column(String(200), nullable=False)
+
+
+
+    __table_args__ = (
+        PrimaryKeyConstraint('book_id', 'voice_id'),
+    )
+
+
+    def __repr__(self):
+        return f"<StoryVoice(story_id={self.story_id}, voice_id={self.voice_id}, audio_path='{self.audio_path}')>"

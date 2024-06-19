@@ -1,5 +1,4 @@
-from datetime import datetime
-
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, Request
 from pydantic import BaseModel
 from typing import Annotated
@@ -7,25 +6,27 @@ import models
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
 import os
-import authentication
+import auth
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 import emails
 from fastapi.security import OAuth2PasswordBearer,OAuth2PasswordRequestForm
-
+from dotenv import dotenv_values
+from auth import get_current_user
 
 app = FastAPI()
 models.Base.metadata.create_all(bind=engine)
+
+
+oauth2_schema = OAuth2PasswordBearer(tokenUrl='token')
+config_credentials = dotenv_values(".env")
 
 
 class UserBase(BaseModel):
     username: str
     email: str
     password: str
-    birth_date: str
-
-
-
+    birthdate: str
 
 
 def get_db():
@@ -37,6 +38,7 @@ def get_db():
 
 
 dp_dependency = Annotated[Session, Depends(get_db)]
+user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
 @app.post("/register/", status_code=status.HTTP_201_CREATED)
@@ -44,8 +46,8 @@ async def register(user_data: UserBase, dp: dp_dependency):
     user = models.User(
         username=user_data.username,
         email=user_data.email,
-        password=authentication.get_password_hash(user_data.password),
-        birth_date=datetime.strptime(user_data.birth_date, '%d-%m-%Y').date()
+        password=auth.hash_password(user_data.password),
+        birthdate=datetime.strptime(user_data.birthdate, '%d/%m/%Y').date()
     )
     temp_user = dp.query(models.User).filter(models.User.email==user.email).first()
 
@@ -68,7 +70,6 @@ async def register(user_data: UserBase, dp: dp_dependency):
         dp.delete(user)
         dp.commit()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-    #send_verification_email(user_data.email)
 
     return {"message": "User registered successfully. Please check your email to verify your account."}
 
@@ -153,7 +154,6 @@ async def get_my_books(db: dp_dependency):
     return my_books_info_list
 
 
-
 @app.post("/remove_from_my_books/{book_id}")
 async def remove_from_my_books(dp: dp_dependency, book_id: int):
     # Retrieve the specific book by book_id
@@ -170,16 +170,6 @@ async def remove_from_my_books(dp: dp_dependency, book_id: int):
     dp.commit()
 
     return {"message": "Book removed from 'My Books'"}
-
-
-@app.get("/")
-async def root():
-    return {"message": "Hello World"}
-
-
-@app.get("/hello/{name}")
-async def say_hello(name: str):
-    return {"message": f"Hello {name}"}
 
 
 @app.get("/get_audio/{book_id}", response_model=dict)
@@ -232,17 +222,65 @@ templates = Jinja2Templates(directory="Templates")
 
 @app.get("/verification/", response_class=HTMLResponse)
 async def email_verification(token: str, request: Request, dp: dp_dependency):
-    user = await authentication.verify_token(token)
+    user = await auth.verify_token(token, dp)
 
     if user:
         user = dp.query(models.User).filter(models.User.id == user.id).first()
         user.is_verified = True
         dp.commit()
         return templates.TemplateResponse("verification.html",
-                                          {"request": request,"username": user.username})
+                                          {"request": request, "username": user.username})
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid token or expired token",
         headers={"www.Authenticate": "Bear"}
     )
+
+
+@app.post("/token", response_model=auth.Token)
+async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], dp: dp_dependency):
+    user = await auth.authenticate_user(form_data.username, form_data.password, dp)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
+                            detail="Could not validate user.")
+    token = auth.create_access_token(user.email, user.id, timedelta(days=30))
+
+    return {"access_token": token, "token_type": "bearer"}
+
+
+@app.get("/", status_code=status.HTTP_200_OK)
+async def user(cur_user: user_dependency, dp: dp_dependency):
+    if cur_user is None:
+        raise HTTPException(status_code=401, detail="Authentication Failed")
+    return {"User": cur_user}
+
+
+@app.get("/get_all_voices/")
+async def get_all_voices(dp: dp_dependency):
+    voices = dp.query(models.Voice).all()
+    voices_info_list = []
+    for voice in voices:
+        voice_info = {
+            "id": voice.id,
+            "name": voice.name,
+            "photo": voice.photo,
+            "gender": voice.gender,
+            "audio": voice.audio
+        }
+        voices_info_list.append(voice_info)
+
+    return voices_info_list
+
+
+@app.get("/bookvoice/")
+async def get_book_voice(book_id: int, voice_id: int, db: dp_dependency):
+    book_voice = db.query(models.BookVoice).filter(
+        (models.BookVoice.book_id == book_id) &
+        (models.BookVoice.voice_id == voice_id)
+    ).first()
+
+    if not book_voice:
+        raise HTTPException(status_code=404, detail="BookVoice record not found")
+
+    return book_voice

@@ -26,7 +26,7 @@ config = ConnectionConfig(
 async def send_email(email: List, instance: User):
     token_data = {
         "id": instance.id,
-        "username": instance.username
+        "email": instance.email
     }
     token = jwt.encode(token_data, config_credentials["SECRET"], algorithm="HS256")
     email_template = f"""
