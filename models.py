@@ -1,4 +1,5 @@
 from sqlalchemy import Boolean, Column, Integer, String, Date, LargeBinary, ForeignKey, PrimaryKeyConstraint
+from sqlalchemy.orm import relationship
 
 from database import Base
 
@@ -13,6 +14,9 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     birthdate = Column(Date)
 
+    # Relationship
+    books = relationship("UserBook", back_populates="user")
+
 
 class Book(Base):
     __tablename__ = 'books'
@@ -26,9 +30,25 @@ class Book(Base):
     ISBN = Column(String(50), index=True, default="Undefined")
     description = Column(String(500),default=".")
     audio = Column(String(200))
-    my_books = Column(Boolean, default=False)
     text = Column(String(200))
 
+    # Relationship
+    users = relationship("UserBook", back_populates="book")
+    book_voices = relationship("BookVoice", back_populates="book")
+
+
+class UserBook(Base):
+    __tablename__ = 'user_books'
+
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    book_id = Column(Integer, ForeignKey('books.id'), primary_key=True)
+
+    user = relationship("User", back_populates="books")
+    book = relationship("Book", back_populates="users")
+
+    __table_args__ = (
+        PrimaryKeyConstraint('user_id', 'book_id'),
+    )
 
 
 class Voice(Base):
@@ -40,6 +60,8 @@ class Voice(Base):
     gender = Column(String(10), nullable=False)
     audio = Column(String(200))
 
+    # Relationships
+    story_voices = relationship("BookVoice", back_populates="voice")
 
 
 class BookVoice(Base):
@@ -49,6 +71,8 @@ class BookVoice(Base):
     voice_id = Column(Integer, ForeignKey('voices.id'), primary_key=True)
     audio = Column(String(200), nullable=False)
 
+    book = relationship("Book", back_populates="book_voices")
+    voice = relationship("Voice", back_populates="story_voices")
 
 
     __table_args__ = (

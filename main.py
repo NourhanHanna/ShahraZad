@@ -118,31 +118,40 @@ async def get_book_details(dp: dp_dependency, book_id: int):
 
 
 @app.put("/add_to_my_books/{book_id}")
-async def add_to_my_books(dp: dp_dependency, book_id: int):
-    # Retrieve the specific record by book_id
+async def add_to_my_books(book_id: int, dp: dp_dependency, user: user_dependency):
+    # Retrieve the specific book by book_id
     book = dp.query(models.Book).filter(models.Book.id == book_id).first()
 
     # Check if the book exists
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    # Update the title field
-    book.my_books = True
+    # Check if the book is already in the user's collection
+    user_book = dp.query(models.UserBook).filter(
+        models.UserBook.user_id == user["id"],
+        models.UserBook.book_id == book_id
+    ).first()
 
-    # Commit the changes to the database
+    if user_book:
+        raise HTTPException(status_code=400, detail="Book already in user's collection")
+
+    # Add the book to the user's collection
+    user_book = models.UserBook(user_id=user["id"], book_id=book_id)
+    dp.add(user_book)
     dp.commit()
 
-    return {"message": "The book added to my books successfully"}
+    return {"message": "The book added to your collection successfully"}
 
 
 @app.get("/get_my_books", response_model=list)
-async def get_my_books(db: dp_dependency):
+async def get_my_books(dp: dp_dependency, user: user_dependency):
     # Query the database to retrieve books where my_books is True
-    books = db.query(models.Book).filter(models.Book.my_books == True).all()
+    user_books = dp.query(models.UserBook).filter(models.UserBook.user_id == user["id"]).all()
 
     # Construct a list of dictionaries with the desired information
     my_books_info_list = []
-    for book in books:
+    for user_book in user_books:
+        book = dp.query(models.Book).filter(models.Book.id == user_book.book_id).first()
         book_info = {
             "id": book.id,
             "title": book.title,
@@ -155,7 +164,7 @@ async def get_my_books(db: dp_dependency):
 
 
 @app.post("/remove_from_my_books/{book_id}")
-async def remove_from_my_books(dp: dp_dependency, book_id: int):
+async def remove_from_my_books(book_id: int, dp: dp_dependency, user: user_dependency):
     # Retrieve the specific book by book_id
     book = dp.query(models.Book).filter(models.Book.id == book_id).first()
 
@@ -163,13 +172,20 @@ async def remove_from_my_books(dp: dp_dependency, book_id: int):
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    # Update the my_books field to False
-    book.my_books = False
+    # Check if the book is in the user's collection
+    user_book = dp.query(models.UserBook).filter(
+        models.UserBook.user_id == user["id"],
+        models.UserBook.book_id == book_id
+    ).first()
 
-    # Commit the changes to the database
+    if not user_book:
+        raise HTTPException(status_code=400, detail="Book not in user's collection")
+
+    # Remove the book from the user's collection
+    dp.delete(user_book)
     dp.commit()
 
-    return {"message": "Book removed from 'My Books'"}
+    return {"message": "Book removed from your collection"}
 
 
 @app.get("/get_audio/{book_id}", response_model=dict)
@@ -200,7 +216,7 @@ async def upload_file(file: UploadFile, dp: dp_dependency):
 
     contents = await file.read()
 
-    file_path = os.path.join(path,"book_text.pdf")
+    file_path = os.path.join(path, "book_text.pdf")
 
     with open(file_path, "wb") as f:
         f.write(contents)
