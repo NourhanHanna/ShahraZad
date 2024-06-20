@@ -300,3 +300,24 @@ async def get_book_voice(book_id: int, voice_id: int, db: dp_dependency):
         raise HTTPException(status_code=404, detail="BookVoice record not found")
 
     return book_voice
+
+
+
+@app.get("/get_my_uploads", response_model=list)
+async def get_my_uploads(dp: dp_dependency, user: user_dependency):
+    # Query the database to retrieve books where my_books is True
+    user_uploads = dp.query(models.UserUpload).filter(models.UserUpload.user_id == user["id"]).all()
+ 
+    # Construct a list of dictionaries with the desired information
+    my_uploads_info_list = []
+    for user_book in user_uploads:
+        book_info = {
+            "id": user_book.upload_id,
+            "title": user_book.title,
+            "audio": user_book.audio,
+            "text": user_book.text
+        }
+        my_uploads_info_list.append(book_info)
+ 
+    return my_uploads_info_list
+ 
