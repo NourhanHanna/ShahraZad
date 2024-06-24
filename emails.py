@@ -1,9 +1,5 @@
-from fastapi import BackgroundTasks, UploadFile, File, Form, Depends, HTTPException, status
-
-
 from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from dotenv import dotenv_values
-from pydantic import BaseModel, EmailStr
 from typing import List
 from models import User
 import jwt
@@ -42,7 +38,7 @@ async def send_email(email: List, instance: User):
             <h1 style="text-align: center; color: #007bff;">Confirm Your Email Address</h1>
             <p>Dear {instance.username},</p>
             <p>Thank you for registering with ShahraZad! To complete your registration and confirm your email address, please click on the following link:</p>
-            <p><a href="http://localhost:8000/verification?token={token}" style="display: block; width: fit-content; margin: 20px auto; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none;">Confirm Email</a></p>
+            <p><a href="http://localhost:8000/auth/verification?token={token}" style="display: block; width: fit-content; margin: 20px auto; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none;">Confirm Email</a></p>
             <p>Please note that this link will expire in [Expiration Time], so be sure to complete the confirmation process as soon as possible.</p>
             <p>If you did not register with ShahraZad, please disregard this email.</p>
             <p>Thank you,<br>ShahraZad Team</p>
@@ -60,13 +56,4 @@ async def send_email(email: List, instance: User):
 
     fn = FastMail(config)
     await fn.send_message(message)
-
-
-
-
-
-
-
-
-
 
