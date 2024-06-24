@@ -20,6 +20,7 @@ models.Base.metadata.create_all(bind=engine)
 
 oauth2_schema = OAuth2PasswordBearer(tokenUrl='token')
 config_credentials = dotenv_values(".env")
+templates = Jinja2Templates(directory="Templates")
 
 
 class UserBase(BaseModel):
@@ -93,13 +94,21 @@ async def get_all_books(dp: dp_dependency):
 
 
 @app.get("/get_book_details/{book_id}", response_model=dict)
-async def get_book_details(dp: dp_dependency, book_id: int):
+async def get_book_details(dp: dp_dependency, user:user_dependency, book_id: int):
     # Retrieve the specific book by book_id
     book = dp.query(models.Book).filter(models.Book.id == book_id).first()
 
     # Check if the book exists
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
+
+    user_book=user_book = dp.query(models.UserBook).filter(
+        models.UserBook.user_id == user["id"],
+        models.UserBook.book_id == book_id
+    ).first()
+    my_books:bool =False;
+    if user_book:
+        my_books=True
 
     # Return the details of the book
     book_details = {
@@ -112,12 +121,13 @@ async def get_book_details(dp: dp_dependency, book_id: int):
         "ISBN": book.ISBN,
         "description": book.description,
         "audio": book.audio,
+        "my_books": my_books
     }
 
     return book_details
 
 
-@app.put("/add_to_my_books/{book_id}")
+@app.post("/add_to_my_books/{book_id}")
 async def add_to_my_books(book_id: int, dp: dp_dependency, user: user_dependency):
     # Retrieve the specific book by book_id
     book = dp.query(models.Book).filter(models.Book.id == book_id).first()
@@ -210,8 +220,8 @@ async def get_audio(dp: dp_dependency, book_id: int):
 
 
 @app.post("/upload_file/")
-async def upload_file(file: UploadFile, dp: dp_dependency):
-    path = "Data\\" + file.filename
+async def upload_file(file: UploadFile, dp: dp_dependency, user: user_dependency):
+    path = "Uploads\\" + file.filename
     os.makedirs(path, exist_ok=True)
 
     contents = await file.read()
@@ -221,9 +231,9 @@ async def upload_file(file: UploadFile, dp: dp_dependency):
     with open(file_path, "wb") as f:
         f.write(contents)
 
-    book = models.Book(
+    book = models.UserUpload(
+        user_id=user["id"],
         title=file.filename,
-        cover_photo=path + '\\cover_photo.jpg',
         audio=path + '\\audio.wav',
         text=path + '\\book_text.pdf'
     )
@@ -233,7 +243,41 @@ async def upload_file(file: UploadFile, dp: dp_dependency):
     return {"message": "File uploaded successfully"}
 
 
-templates = Jinja2Templates(directory="Templates")
+@app.get("/get_my_uploads", response_model=list)
+async def get_my_uploads(dp: dp_dependency, user: user_dependency):
+    # Query the database to retrieve books where my_books is True
+    user_uploads = dp.query(models.UserUpload).filter(models.UserUpload.user_id == user["id"]).all()
+
+    # Construct a list of dictionaries with the desired information
+    my_uploads_info_list = []
+    for user_upload in user_uploads:
+        book_info = {
+            "id": user_upload.upload_id,
+            "title": user_upload.title,
+            "audio": user_upload.audio,
+            "text": user_upload.text,
+            "cover_photo": user_upload.cover_photo
+        }
+        my_uploads_info_list.append(book_info)
+
+    return my_uploads_info_list
+
+
+@app.post("/delete_upload/{upload_id}")
+async def delete_upload(upload_id: int, dp: dp_dependency, user: user_dependency):
+    user_upload = dp.query(models.UserUpload).filter(
+        models.UserUpload.user_id == user["id"],
+        models.UserUpload.upload_id == upload_id
+    ).first()
+
+    # Check if the book exists
+    if not user_upload:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    dp.delete(user_upload)
+    dp.commit()
+
+    return {"message": "Book removed Successfully"}
 
 
 @app.get("/verification/", response_class=HTMLResponse)
@@ -293,31 +337,9 @@ async def get_all_voices(dp: dp_dependency):
 async def get_book_voice(book_id: int, voice_id: int, db: dp_dependency):
     book_voice = db.query(models.BookVoice).filter(
         (models.BookVoice.book_id == book_id) &
-        (models.BookVoice.voice_id == voice_id)
-    ).first()
+        (models.BookVoice.voice_id == voice_id)).first()
 
     if not book_voice:
         raise HTTPException(status_code=404, detail="BookVoice record not found")
 
     return book_voice
-
-
-
-@app.get("/get_my_uploads", response_model=list)
-async def get_my_uploads(dp: dp_dependency, user: user_dependency):
-    # Query the database to retrieve books where my_books is True
-    user_uploads = dp.query(models.UserUpload).filter(models.UserUpload.user_id == user["id"]).all()
- 
-    # Construct a list of dictionaries with the desired information
-    my_uploads_info_list = []
-    for user_book in user_uploads:
-        book_info = {
-            "id": user_book.upload_id,
-            "title": user_book.title,
-            "audio": user_book.audio,
-            "text": user_book.text
-        }
-        my_uploads_info_list.append(book_info)
- 
-    return my_uploads_info_list
- 

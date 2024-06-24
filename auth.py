@@ -104,7 +104,8 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], dp: dp
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "birthdate": user.birthdate
+            "birthdate": user.birthdate,
+            "profile_photo": user.profile_photo
         }
     except:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
