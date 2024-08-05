@@ -56,4 +56,3 @@ async def send_email(email: List, instance: User):
 
     fn = FastMail(config)
     await fn.send_message(message)
-

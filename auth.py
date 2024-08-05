@@ -1,12 +1,9 @@
-
 from datetime import timedelta, datetime, timezone
-
 from passlib.context import CryptContext
-
 import models
 from dotenv import dotenv_values
-from fastapi import HTTPException, status, Depends, APIRouter, Request
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import HTTPException, status,Depends, APIRouter, Request
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from database import SessionLocal
 from typing import Annotated
@@ -15,6 +12,7 @@ import jwt
 import emails
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.security import OAuth2PasswordRequestForm
 
 router = APIRouter(
     prefix='/auth',
@@ -25,7 +23,6 @@ config_credentials = dotenv_values(".env")
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl='auth/token')
-
 templates = Jinja2Templates(directory="Templates")
 
 
@@ -104,7 +101,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], dp: dp
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                                 detail="Could not validate user.")
 
-        user=dp.query(models.User).filter(models.User.email==email).first()
+        user = dp.query(models.User).filter(models.User.email==email).first()
 
         if not user:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
@@ -117,12 +114,10 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)], dp: dp
             "birthdate": user.birthdate,
             "profile_photo": user.profile_photo
         }
+
     except:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
                             detail="Could not validate user.")
-
-
-user_dependency = Annotated[dict, Depends(get_current_user)]
 
 
 class UserBase(BaseModel):
