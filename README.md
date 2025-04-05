@@ -61,14 +61,14 @@ You can watch our application demo here :
 ---
 # Team Members
 
-- **Joseph Ashraf** – AI Team
-- **Yousry Essam** – AI Team
-- **Magy Samwel** – AI Team
-- **Sarah Raouf** – AI Team
-- **Rola Nashaat** – Mobile Team - Frontend
-- **Haidy Atef** – Mobile Team - Frontend
-- **Nourhan Hanna** - Mobile Team - Backend
-- **Andrew Ezzat** – Mobile Team - Backend
+- **Joseph Ashraf** – AI Development Team
+- **Yousry Essam** – AI Development Team
+- **Magy Samwel** – AI Development Team
+- **Sarah Raouf** – AI Development Team
+- **Rola Nashaat** – Application Development Team - Frontend
+- **Haidy Atef** – Application Development Team - Frontend
+- **Nourhan Hanna** - Application Development Team - Backend
+- **Andrew Ezzat** – Application Development Team - Backend
 ---
 
 # Disclaimer
